@@ -43,6 +43,9 @@ local function DonationsTooltip_GetInfo(control, displayName)
         if GetCVar("language.2") == "de" then
             colWidth = 260
         end
+        if GetCVar("language.2") == "fr" then
+            colWidth = 240
+        end
 
         -- TO-DO: Refacor this into a loop
 
