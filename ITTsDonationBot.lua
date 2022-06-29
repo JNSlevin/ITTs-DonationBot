@@ -1,5 +1,6 @@
 ITTsDonationBot = ZO_CallbackObject:New()
 ITTsDonationBot.name = "ITTsDonationBot"
+ITTsDonationBotListener = { }
 
 local db = {}
 local LAM2 = LibAddonMenu2
@@ -667,6 +668,8 @@ function ITTsDonationBot:Initialize()
   self:CheckGuildPermissions()
 
   ITTsDonationBot.Roster:Enable()
+
+  ITTsDonationBot.SetupListeners()
 end
 
 function ITTsDonationBot:CheckGuildPermissions(newGuildId)
@@ -876,80 +879,83 @@ end
 -- -----------
 -- LibHistoire
 -- -----------
-function ITTsDonationBot:LoginListener(guildId)
-  local bankListener = LibHistoire:CreateGuildHistoryListener(guildId, GUILD_HISTORY_BANK)
+function ITTsDonationBot:QueueListener(guildId)
+  -- returns nil when not ready, so it doesn't exist
+  ITTsDonationBotListener[guildId] = LH:CreateGuildHistoryListener(guildId, GUILD_HISTORY_BANK)
+  -- If nil it's not assigned so do it again until it doesn't return nil
+  if not ITTsDonationBotListener[guildId] then
+    -- Debug LibHistoireListener not ready
+    zo_callLater(function() ITTsDonationBot:QueueListener(guildId) end, 1000)
+  else
+    -- Once it isn't nil then create the rest of the listener
+    ITTsDonationBot:CreateListener(guildId)
+  end
+end
+
+function ITTsDonationBot:CreateListener(guildId)
   local lastEvent = 1413120020
   if ITTsDonationBotData ~= nil then
     lastEvent = ITTsDonationBotData.records[worldName]["lastEvent"]
   end
-  bankListener:SetAfterEventTime(lastEvent - 21600)
+  -- why use value - 21600 which is 0.36 minutes
+  local setAfterTimestamp = GetTimeStamp() - ZO_ONE_DAY_IN_SECONDS -- or that times 2 for two days
+  ITTsDonationBotListener[guildId]:SetAfterEventTime(setAfterTimestamp)
 
-  bankListener:SetNextEventCallback(
+  ITTsDonationBotListener[guildId]:SetEventCallback(
     function(eventType, eventId, eventTime, param1, param2, param3, param4, param5, param6)
       self:SaveEvent(guildId, eventType, eventTime, param1, param2, eventId)
     end
   )
 
-  bankListener:SetIterationCompletedCallback(
+  ITTsDonationBotListener[guildId]:SetIterationCompletedCallback(
     function()
       logger:Warn("D O N E")
     end
   )
-  -- bankListener:SetStopOnLastEvent(true)
-  bankListener:Start()
+  -- ITTsDonationBotListener[guildId]:SetStopOnLastEvent(true)
+  ITTsDonationBotListener[guildId]:Start()
 end
-function ITTsDonationBot:MissingEntries()
-  local guilds = self:GetGuildMap()
-  for i = 1, #guilds do
-    guildId = GetGuildId(i)
-    local bankListener = LibHistoire:CreateGuildHistoryListener(guildId, GUILD_HISTORY_BANK)
-    bankListener:SetMissedEventCallback(
-      function(eventType, eventId, eventTime, param1, param2, param3, param4, param5, param6)
-        self:SaveEvent(guildId, eventType, eventTime, param1, param2, eventId)
-      end
-    )
 
-    bankListener:Start()
-    ITTsDonationBot:ReCacheTooltips(guildId)
-  end
-end
 function ITTsDonationBot:ScanEntireLH()
   local guilds = self:GetGuildMap()
   for i = 1, #guilds do
     guildId = GetGuildId(i)
-    local bankListener = LibHistoire:CreateGuildHistoryListener(guildId, GUILD_HISTORY_BANK)
-    bankListener:SetEventCallback(
+    ITTsDonationBotListener[guildId]:Stop()
+    ITTsDonationBotListener[guildId]:SetAfterEventId(StringToId64("0"))
+    ITTsDonationBotListener[guildId]:SetEventCallback(
       function(eventType, eventId, eventTime, param1, param2, param3, param4, param5, param6)
         self:SaveEvent(guildId, eventType, eventTime, param1, param2, eventId)
       end
     )
-
-    bankListener:Start()
+    ITTsDonationBotListener[guildId]:Start()
     ITTsDonationBot:ReCacheTooltips(guildId)
   end
 end
+
 function ITTsDonationBot:ScanSpecifcRange(guildId, starTime, endTime)
-  local bankListener = LibHistoire:CreateGuildHistoryListener(guildId, GUILD_HISTORY_BANK)
-  bankListener:SetTimeFrame(startTime, endTime)
-  bankListener:SetNextEventCallback(
+  ITTsDonationBotListener[guildId]:Stop()
+  ITTsDonationBotListener[guildId]:SetTimeFrame(startTime, endTime)
+  ITTsDonationBotListener[guildId]:SetEventCallback(
     function(eventType, eventId, eventTime, param1, param2, param3, param4, param5, param6)
       self:SaveEvent(guildId, eventType, eventTime, param1, param2, eventId)
     end
   )
-  banklistener:Start()
+  ITTsDonationBotListener[guildId]:Start()
 end
 
 function ITTsDonationBot.SetupListeners()
   -- local guildId = ITTsDonationBot:GetGuildMap()
 
   for i = 1, GetNumGuilds() do
-    ITTsDonationBot:LoginListener(GetGuildId(i))
+    local guildId = GetGuildId(i)
+    if ITTsDonationBotListener[guildId] == nil then ITTsDonationBotListener[guildId] = { } end
+    ITTsDonationBot:QueueListener(guildId)
   end
 end
+
 function ITTsDonationBot.YellWhenDone(guildId, category)
   logger:Warn("History Scan finished for " .. GetGuildName(guildId) .. "!")
 end
-LH:RegisterCallback(LH.callback.INITIALIZED, ITTsDonationBot.SetupListeners)
 LH:RegisterCallback(LH.callback.HISTORY_RESCAN_ENDED, ITTsDonationBot.YellWhenDone)
 
 -- -------------
