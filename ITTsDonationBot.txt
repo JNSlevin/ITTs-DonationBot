@@ -5,9 +5,8 @@
 ## AddOnVersion: 1.6.5
 ## Author: |c00a313|Ghostbane
 ## SavedVariables: ITTsDonationBotSettings
-## DependsOn: LibAddonMenu-2.0 LibChatMessage LibGuildRoster
-
-##LibDebugLogger>=180
+## DependsOn: LibAddonMenu-2.0>=33 LibChatMessage LibGuildRoster LibHistoire>=453
+## OptionalDependsOn: LibDebugLogger>=255 DebugLogViewer>=558
 
 ITTsDonationBot.lua
 i18n/en.lua
