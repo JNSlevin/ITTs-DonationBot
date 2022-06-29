@@ -3,8 +3,9 @@ ITTsDonationBot.name = "ITTsDonationBot"
 
 local db = {}
 local LAM2 = LibAddonMenu2
---[[ local logger = LibDebugLogger(ITTsDonationBot.name)
-logger:SetEnabled(false) ]]
+local LH = LibHistoire
+local logger = LibDebugLogger(ITTsDonationBot.name)
+logger:SetEnabled(true)
 local chat = LibChatMessage("ITTsDonationBot", "ITTs-DB")
 
 local SECONDS_IN_HOUR = 60 * 60
@@ -12,7 +13,7 @@ local SECONDS_IN_DAY = SECONDS_IN_HOUR * 24
 local SECONDS_IN_WEEK = SECONDS_IN_DAY * 7
 
 local worldName = GetWorldName()
-
+--local data = ITTsDonationBotData[worldName]
 local defaults = {
   settings = {
     [worldName] = {
@@ -38,7 +39,6 @@ local defaults = {
       queryTimeframe = "Last Week"
     }
   },
-  records = {},
   tooltip = {}
 }
 
@@ -176,7 +176,7 @@ local function makeSettings()
     getFunc = function()
       if ITT_DonationBotSettingsLogo and _desc then
         makeITTDescription()
-        _desc = true
+        local _desc = true
       end
 
       return db.settings[worldName].notifications.screen
@@ -448,18 +448,68 @@ local function makeSettings()
     isExtraWide = true,
     reference = "ITT_LottoAmountList2"
   }
-
   optionsData[#optionsData + 1] = {
     type = "submenu",
     name = ITTsDonationBot:parse("SETTINGS_LOTTO_NAME"),
-    tooltip = "$$$", --(optional)
+    -- tooltip = "$$$", --(optional)
     controls = lottoOptions
   }
+  local ITTLibHistoireOptions = {}
+  optionsData[#optionsData + 1] = {
+    type = "submenu",
+    name = "LibHistoire Options",
+    controls = ITTLibHistoireOptions
+  }
+  ITTLibHistoireOptions[#ITTLibHistoireOptions + 1] = {
+    type = "header",
+    name = "Missing Entries",
+    width = "full"
+  }
+  ITTLibHistoireOptions[#ITTLibHistoireOptions + 1] = {
+    type = "description",
+    text = "This will scan LibHistoire for any missing entries",
+    width = "half"
+  }
+  ITTLibHistoireOptions[#ITTLibHistoireOptions + 1] = {
+    type = "button",
+    name = "Scan",
+    tooltip = "Button's tooltip text.",
+    func = function()
+      return ITTsDonationBot:MissingEntries()
+    end,
+    width = "half", --or "full" (optional)
+    warning = "This will import the records which were saved the old way, might cause your game to hang for a few seconds.", --(optional)
+    isDangerous = true
+  }
+  ITTLibHistoireOptions[#ITTLibHistoireOptions + 1] = {
+    type = "header",
+    name = "Full Scan",
+    width = "full"
+  }
+  ITTLibHistoireOptions[#ITTLibHistoireOptions + 1] = {
+    type = "description",
+    text = "This will scan the entirety of LibHistoires data (might take a while)",
+    width = "half"
+  }
+  ITTLibHistoireOptions[#ITTLibHistoireOptions + 1] = {
+    type = "button",
+    name = "Scan",
+    tooltip = "Button's tooltip text.",
+    func = function()
+      return ITTsDonationBot:ScanEntireLH()
+    end,
+    width = "half", --or "full" (optional)
+    warning = "This can take time, depending on how much data you are missing and how much data you have stored in your LibHistoire.", --(optional)
+    isDangerous = true
+  }
+  local ITTImportOptions = {}
 
   optionsData[#optionsData + 1] = {
-    type = "description",
-    title = "",
-    text = [[ ]]
+    type = "submenu",
+    name = "Import Options",
+    tooltip = "xxx", --(optional)
+    controls = ITTImportOptions,
+    reference = "ITTImportMenu"
   }
 
   optionsData[#optionsData + 1] = {
@@ -475,7 +525,27 @@ local function makeSettings()
     imageHeight = "192",
     reference = "ITT_DonationBotSettingsLogo"
   }
-
+  ITTImportOptions[#ITTImportOptions + 1] = {
+    type = "header",
+    name = "Transfer old records",
+    width = "full"
+  }
+  ITTImportOptions[#ITTImportOptions + 1] = {
+    type = "description",
+    text = "|cff0000WARNING BACK UP YOUR SAVED VARIABLES BEFORE PRESSING THIS BUTTON",
+    width = "half"
+  }
+  ITTImportOptions[#ITTImportOptions + 1] = {
+    type = "button",
+    name = "Import",
+    tooltip = "Have you back upped your Saved Variables?.",
+    func = function()
+      return ITTsDonationBot:TransferData(), ITTImportMenu:SetHidden(true)
+    end,
+    width = "half", --or "full" (optional)
+    warning = "This will import the records which were saved the old way, might cause your game to hang for a few seconds. Make sure your Saved Variables are back upped.", --(optional)
+    isDangerous = true
+  }
   local _desc = true
 
   local function makeITTDescription()
@@ -494,6 +564,10 @@ local function makeSettings()
     ITTDLabel:SetAnchor(TOP, ITTsDonationBotSettingsLogoTitle, BOTTOM, 0, -5)
 
     ITT_HideMePls:SetHidden(true)
+
+    if db.records == nil then
+      ITTImportMenu:SetHidden(true)
+    end
   end
 
   optionsData[#optionsData + 1] = {
@@ -527,17 +601,33 @@ local function OnPlayerActivated(eventCode)
   ITTsDonationBot:Initialize()
 end
 
-local function OnHistoryResponseReceived(ev, guildId, category)
-  if category == GUILD_HISTORY_BANK and ITTsDonationBot:IsGuildEnabled(guildId) then
-    ITTsDonationBot:RunScanCycle(guildId)
-  end
-end
-
 local function ITTsDonationBot_OnAddOnLoaded(eventCode, addOnName)
   if addOnName == ITTsDonationBot.name then
     db = ZO_SavedVars:NewAccountWide("ITTsDonationBotSettings", 1, nil, defaults)
 
     local panelData, optionsData = makeSettings()
+    local guilds = ITTsDonationBot:GetGuildMap()
+    if not ITTsDonationBotData then
+      ITTsDonationBotData = {}
+    end
+    if not ITTsDonationBotData.records then
+      ITTsDonationBotData.records = {}
+    end
+    if not ITTsDonationBotData.records[worldName] then
+      ITTsDonationBotData.records[worldName] = {}
+    end
+    if not ITTsDonationBotData.records[worldName].lastEvent then
+      ITTsDonationBotData.records[worldName].lastEvent = 1413120020
+    end
+    for k, v in pairs(ITTsDonationBotData.records[worldName]) do
+      --logger:Debug(k)
+      if not ITTsDonationBotData.records[worldName][k] then
+        ITTsDonationBotData.records[worldName][k] = {}
+      end
+      if not ITTsDonationBotData.records[worldName][k] then
+        ITTsDonationBotData.records[worldName][k] = {}
+      end
+    end
 
     LAM2:RegisterAddonPanel("ITTsDonationBotOptions", panelData)
     LAM2:RegisterOptionControls("ITTsDonationBotOptions", optionsData)
@@ -554,7 +644,6 @@ end
 -- Methods
 -- --------------------
 function ITTsDonationBot:Initialize()
-  EVENT_MANAGER:RegisterForEvent(ITTsDonationBot.name, EVENT_GUILD_HISTORY_RESPONSE_RECEIVED, OnHistoryResponseReceived)
   EVENT_MANAGER:RegisterForEvent(
     ITTsDonationBot.name,
     EVENT_GUILD_SELF_JOINED_GUILD,
@@ -562,6 +651,7 @@ function ITTsDonationBot:Initialize()
       ITTsDonationBot:CheckGuildPermissions(newGuildId)
     end
   )
+
   EVENT_MANAGER:RegisterForEvent(
     ITTsDonationBot.name,
     EVENT_GUILD_SELF_LEFT_GUILD,
@@ -570,15 +660,11 @@ function ITTsDonationBot:Initialize()
     end
   )
 
-  if not db.records[worldName] then
-    db.records[worldName] = {}
-  end
   if not db.tooltip[worldName] then
     db.tooltip[worldName] = {}
   end
 
   self:CheckGuildPermissions()
-  self:RequestAllHistory()
 
   ITTsDonationBot.Roster:Enable()
 end
@@ -630,8 +716,8 @@ function ITTsDonationBot:CheckGuildPermissions(newGuildId)
     end
 
     if db.settings[worldName].guilds[i].selected then
-      if not db.records[worldName][db.settings[worldName].guilds[i].id] then
-        db.records[worldName][db.settings[worldName].guilds[i].id] = {}
+      if not ITTsDonationBotData.records[worldName][db.settings[worldName].guilds[i].id] then
+        ITTsDonationBotData.records[worldName][db.settings[worldName].guilds[i].id] = {}
       end
     end
   end
@@ -652,8 +738,8 @@ function ITTsDonationBot:HasTooltipInfo(guildId, displayName)
 end
 
 function ITTsDonationBot:CreateTooltipInfo(guildId, displayName)
-  if db.records[worldName][guildId][displayName] then
-    local store = db.records[worldName][guildId][displayName]
+  if ITTsDonationBotData.records[worldName][guildId][displayName] then
+    local store = ITTsDonationBotData.records[worldName][guildId][displayName]
     local latestDonations = {}
     local indexCheck = 1
 
@@ -661,7 +747,12 @@ function ITTsDonationBot:CreateTooltipInfo(guildId, displayName)
     local thisWeek = self:QueryValues(guildId, displayName, self:GetTraderWeekStart(), self:GetTraderWeekEnd())
     local lastWeek = self:QueryValues(guildId, displayName, self:GetTraderWeekStart() - SECONDS_IN_WEEK, self:GetTraderWeekStart())
     local priorWeek =
-      self:QueryValues(guildId, displayName, ITTsDonationBot:GetTraderWeekStart() - (SECONDS_IN_WEEK * 2), ITTsDonationBot:GetTraderWeekStart() - SECONDS_IN_WEEK)
+      self:QueryValues(
+      guildId,
+      displayName,
+      ITTsDonationBot:GetTraderWeekStart() - (SECONDS_IN_WEEK * 2),
+      ITTsDonationBot:GetTraderWeekStart() - SECONDS_IN_WEEK
+    )
 
     local summary = {
       log = {},
@@ -683,7 +774,6 @@ function ITTsDonationBot:CreateTooltipInfo(guildId, displayName)
         summary.total = summary.total + v.amount
       end
     end
-
     table.sort(
       keyset,
       function(a, b)
@@ -693,8 +783,8 @@ function ITTsDonationBot:CreateTooltipInfo(guildId, displayName)
 
     for i = 1, 5 do
       if keyset[i] then
-        id = keyset[i]
-        value = store[id]
+        local id = keyset[i]
+        local value = store[id]
 
         -- formatedTime = os.date("*t", value.timestamp)
 
@@ -747,44 +837,136 @@ function ITTsDonationBot:GetTooltipCache(guildId, displayName)
   return tooltipData
 end
 
-function ITTsDonationBot:SaveEvent(guildId, eventIndex)
-  local timeStamp = GetTimeStamp()
-  local eventType, secsSinceEvent, displayName, amount, _, _, _, _, id = GetGuildEventInfo(guildId, GUILD_HISTORY_BANK, eventIndex)
-
-  if eventType == GUILD_EVENT_BANKGOLD_ADDED and secsSinceEvent >= 0 then
-    local eventTimestamp = timeStamp - secsSinceEvent
-    if eventTimestamp < 0 then
-      eventTimestamp = timestamp
+function ITTsDonationBot:SaveEvent(guildId, eventType, eventTime, param1, param2, eventId)
+  local id = Id64ToString(eventId)
+  local secsSinceEvent = GetTimeStamp() - eventTime
+  if ITTsDonationBotData.records[worldName].lastEvent ~= nil then
+    if eventTime > ITTsDonationBotData.records[worldName].lastEvent then
+      ITTsDonationBotData.records[worldName].lastEvent = eventTime
     end
-    local eventId = GetGuildEventId(guildId, category, eventIndex)
-    local eventIdNum = tonumber(Id64ToString(eventId))
-
-    if not db.records[worldName][guildId][displayName] then
-      db.records[worldName][guildId][displayName] = {}
+  else
+    ITTsDonationBotData.records[worldName].lastEvent = eventTime
+  end
+  if eventType == GUILD_EVENT_BANKGOLD_ADDED and ITTsDonationBot:IsGuildEnabled(guildId) then
+    local amount = param2
+    local displayName = param1
+    if ITTsDonationBotData ~= nil then
+      if not ITTsDonationBotData.records[worldName][guildId][displayName] then
+        ITTsDonationBotData.records[worldName][guildId][displayName] = {}
+      end
     end
 
     if secsSinceEvent < SECONDS_IN_DAY then
-      if not db.records[worldName][guildId][displayName][id] then
+      if not ITTsDonationBotData.records[worldName][guildId][displayName][id] then
         self:DisplayNotifications(guildId, displayName, amount, secsSinceEvent)
       end
     end
 
-    if not db.records[worldName][guildId][displayName][id] then
-      db.records[worldName][guildId][displayName][id] = {amount = amount, timestamp = eventTimestamp}
-    elseif db.records[worldName][guildId][displayName][id] and not db.records[worldName][guildId][displayName][id].eventTimestamp then
-      db.records[worldName][guildId][displayName][id] = {amount = amount, timestamp = eventTimestamp}
+    if not ITTsDonationBotData.records[worldName][guildId][displayName][id] then
+      ITTsDonationBotData.records[worldName][guildId][displayName][id] = {amount = amount, timestamp = eventTime}
+    elseif
+      ITTsDonationBotData.records[worldName][guildId][displayName][id] and
+        not ITTsDonationBotData.records[worldName][guildId][displayName][id].eventTimestamp
+     then
+      ITTsDonationBotData.records[worldName][guildId][displayName][id] = {amount = amount, timestamp = eventTime}
     end
   end
 end
 
+-- -----------
+-- LibHistoire
+-- -----------
+function ITTsDonationBot:LoginListener(guildId)
+  local bankListener = LibHistoire:CreateGuildHistoryListener(guildId, GUILD_HISTORY_BANK)
+  local lastEvent = 1413120020
+  if ITTsDonationBotData ~= nil then
+    lastEvent = ITTsDonationBotData.records[worldName]["lastEvent"]
+  end
+  bankListener:SetAfterEventTime(lastEvent - 21600)
+
+  bankListener:SetNextEventCallback(
+    function(eventType, eventId, eventTime, param1, param2, param3, param4, param5, param6)
+      self:SaveEvent(guildId, eventType, eventTime, param1, param2, eventId)
+    end
+  )
+
+  bankListener:SetIterationCompletedCallback(
+    function()
+      logger:Warn("D O N E")
+    end
+  )
+  -- bankListener:SetStopOnLastEvent(true)
+  bankListener:Start()
+end
+function ITTsDonationBot:MissingEntries()
+  local guilds = self:GetGuildMap()
+  for i = 1, #guilds do
+    guildId = GetGuildId(i)
+    local bankListener = LibHistoire:CreateGuildHistoryListener(guildId, GUILD_HISTORY_BANK)
+    bankListener:SetMissedEventCallback(
+      function(eventType, eventId, eventTime, param1, param2, param3, param4, param5, param6)
+        self:SaveEvent(guildId, eventType, eventTime, param1, param2, eventId)
+      end
+    )
+
+    bankListener:Start()
+    ITTsDonationBot:ReCacheTooltips(guildId)
+  end
+end
+function ITTsDonationBot:ScanEntireLH()
+  local guilds = self:GetGuildMap()
+  for i = 1, #guilds do
+    guildId = GetGuildId(i)
+    local bankListener = LibHistoire:CreateGuildHistoryListener(guildId, GUILD_HISTORY_BANK)
+    bankListener:SetEventCallback(
+      function(eventType, eventId, eventTime, param1, param2, param3, param4, param5, param6)
+        self:SaveEvent(guildId, eventType, eventTime, param1, param2, eventId)
+      end
+    )
+
+    bankListener:Start()
+    ITTsDonationBot:ReCacheTooltips(guildId)
+  end
+end
+function ITTsDonationBot:ScanSpecifcRange(guildId, starTime, endTime)
+  local bankListener = LibHistoire:CreateGuildHistoryListener(guildId, GUILD_HISTORY_BANK)
+  bankListener:SetTimeFrame(startTime, endTime)
+  bankListener:SetNextEventCallback(
+    function(eventType, eventId, eventTime, param1, param2, param3, param4, param5, param6)
+      self:SaveEvent(guildId, eventType, eventTime, param1, param2, eventId)
+    end
+  )
+  banklistener:Start()
+end
+
+function ITTsDonationBot.SetupListeners()
+  -- local guildId = ITTsDonationBot:GetGuildMap()
+
+  for i = 1, GetNumGuilds() do
+    ITTsDonationBot:LoginListener(GetGuildId(i))
+  end
+end
+function ITTsDonationBot.YellWhenDone(guildId, category)
+  logger:Warn("History Scan finished for " .. GetGuildName(guildId) .. "!")
+end
+LH:RegisterCallback(LH.callback.INITIALIZED, ITTsDonationBot.SetupListeners)
+LH:RegisterCallback(LH.callback.HISTORY_RESCAN_ENDED, ITTsDonationBot.YellWhenDone)
+
+-- -------------
+-- Notifications
+-- -------------
 function ITTsDonationBot:DisplayNotifications(guildId, displayName, amount, seconds)
+  local memberIndex = GetGuildMemberIndexFromDisplayName(guildId, displayName)
+  local _, _, rankIndex = GetGuildMemberInfo(guildId, memberIndex)
+  local iconIndex = GetGuildRankIconIndex(guildId, rankIndex)
+  local rankIcon = GetGuildRankLargeIcon(iconIndex)
   local shoutMsg =
     ITTsDonationBot:parse(
     "NOTIFICATION",
     {
-      user = "|Caaff00" .. displayName .. "|CFFFFFF",
-      amount = "|Cfce803" .. ZO_LocalizeDecimalNumber(amount) .. " |t14:14:EsoUI/Art/currency/currency_gold.dds|t|CFFFFFF",
-      guild = "|cffa600" .. GetGuildName(guildId) .. "|CFFFFFF",
+      user = "|t35:35:" .. rankIcon .. "|t|Caaff00" .. displayName .. "|CFFFFFF",
+      amount = "|Cfce803" .. ZO_LocalizeDecimalNumber(amount) .. " |t25:25:EsoUI/Art/currency/currency_gold.dds|t|CFFFFFF",
+      guild = "|cffa600" .. ITTsDonationBot.CreateGuildLink(guildId) .. "|CFFFFFF",
       time = "|cFFFFFF" .. ZO_FormatDurationAgo(seconds)
     }
   )
@@ -795,9 +977,9 @@ function ITTsDonationBot:DisplayNotifications(guildId, displayName, amount, seco
     ITTsDonationBot:parse(
     "NOTIFICATION",
     {
-      user = "|Caaff00" .. displayName .. "|CFFFFFF",
+      user = "|t25:25:" .. rankIcon .. "|t|Caaff00" .. displayName .. "|CFFFFFF",
       amount = "|Cfce803" .. ZO_LocalizeDecimalNumber(amount) .. " |t14:14:EsoUI/Art/currency/currency_gold.dds|t|CFFFFFF",
-      guild = "|cffa600" .. GetGuildName(guildId) .. "|CFFFFFF",
+      guild = "|cffa600" .. ITTsDonationBot.CreateGuildLink(guildId) .. "|CFFFFFF",
       time = "|cFFFFFF" .. ZO_FormatDurationAgo(seconds)
     }
   )
@@ -821,27 +1003,9 @@ function ITTsDonationBot:DisplayNotifications(guildId, displayName, amount, seco
   )
 end
 
-function ITTsDonationBot:RunScanCycle(guildId, forceIndex)
-  self.scanHistory = self.scanHistory or {}
-  local start = self.scanHistory[guildId] or 1
-  local numGuildEvents = GetNumGuildEvents(guildId, GUILD_HISTORY_BANK)
-
-  if forceIndex then
-    start = 1
-  end
-
-  for index = start, numGuildEvents do
-    self:SaveEvent(guildId, index)
-  end
-
-  self.scanHistory[guildId] = numGuildEvents + 1
-
-  self:ReCacheTooltips(guildId)
-end
-
 function ITTsDonationBot:ReCacheTooltips(guildId)
-  if db.records[worldName][guildId] then
-    for k, v in pairs(db.records[worldName][guildId]) do
+  if ITTsDonationBotData.records[worldName][guildId] then
+    for k, v in pairs(ITTsDonationBotData.records[worldName][guildId]) do
       self:CreateTooltipInfo(guildId, k)
     end
   end
@@ -876,8 +1040,8 @@ end
 function ITTsDonationBot:QueryValues(guildId, displayName, startTime, endTime)
   local value = 0
 
-  if db.records[worldName][guildId] and db.records[worldName][guildId][displayName] then
-    for key, record in pairs(db.records[worldName][guildId][displayName]) do
+  if ITTsDonationBotData.records[worldName][guildId] and ITTsDonationBotData.records[worldName][guildId][displayName] then
+    for key, record in pairs(ITTsDonationBotData.records[worldName][guildId][displayName]) do
       if record.timestamp and record.timestamp > startTime and record.timestamp < endTime then
         value = record.amount + value
       end
@@ -885,57 +1049,6 @@ function ITTsDonationBot:QueryValues(guildId, displayName, startTime, endTime)
   end
 
   return value
-end
-
-function ITTsDonationBot:RequestAllHistory()
-  for _, guildId in pairs(self:GetGuildMap()) do
-    self:RequestHistory(guildId, GUILD_HISTORY_BANK)
-  end
-end
-
-function ITTsDonationBot:RequestHistory(gID, guildHistoryCategory)
-  local cooldown = 1000 * 60
-
-  -- logger:Info('ITTsDonationBot:RequestHistory() running -', GetGuildName(gID)..'-'..guildHistoryCategory)
-
-  if DoesGuildHistoryCategoryHaveOutstandingRequest(gID, guildHistoryCategory) == false and IsGuildHistoryCategoryRequestQueued(gID, guildHistoryCategory) == false then
-    if DoesGuildHistoryCategoryHaveMoreEvents(gID, guildHistoryCategory) then
-      -- logger:Info('More history exists for ',GetGuildName(gID)..'-'..guildHistoryCategory)
-
-      if RequestMoreGuildHistoryCategoryEvents(gID, guildHistoryCategory) then
-        -- logger:Info('Requesting Guild History:',GetGuildName(gID)..'-'..guildHistoryCategory)
-        zo_callLater(
-          function()
-            ITTsDonationBot:RequestHistory(gID, guildHistoryCategory)
-          end,
-          cooldown
-        )
-      else
-        -- logger:Info('Request cooldown for ',GetGuildName(gID)..'-'..guildHistoryCategory,' has not expired yet, re-calling in a few minutes')
-        zo_callLater(
-          function()
-            ITTsDonationBot:RequestHistory(gID, guildHistoryCategory)
-          end,
-          cooldown
-        )
-      end
-    else
-      -- logger:Info('No more history exists for ',GetGuildName(gID)..'-'..guildHistoryCategory)
-      -- logger:Info('Total:',GetNumGuildEvents(gID, guildHistoryCategory))
-
-      if GetNumGuildEvents(gID, guildHistoryCategory) > 0 and db.records[worldName][gId] == nil then
-        self:RunScanCycle(gID, 1)
-      end
-    end
-  else
-    -- logger:Info('Scan requirements not met: Trying again in 1m')
-    zo_callLater(
-      function()
-        ITTsDonationBot:RequestHistory(gID, guildHistoryCategory)
-      end,
-      cooldown
-    )
-  end
 end
 
 function ITTsDonationBot:GetTimestampOfDayStart(offset)
@@ -961,6 +1074,159 @@ function ITTsDonationBot:GetTraderWeekStart()
   return time - SECONDS_IN_WEEK
 end
 
+-- ---------------
+-- CustomGuildLink
+-- --------------
+function ITTsDonationBot.GetGuildColor(i)
+  local r, g, b = GetChatCategoryColor(_G["CHAT_CATEGORY_GUILD_" .. tostring(i)])
+  local colorObject = ZO_ColorDef:New(r, g, b)
+
+  return {
+    rgb = {r, g, b},
+    hex = colorObject:ToHex()
+  }
+end
+function ITTsDonationBot.CreateGuildLink(guildId)
+  -- local alliance = GetGuildAlliance(guildId)
+  local gIndex = ITTsDonationBot.GetGuildIndex(guildId)
+  local name = GetGuildName(guildId)
+  local color = ITTsDonationBot.GetGuildColor(gIndex)
+
+  local guildLink = "|c" .. color.hex .. "[|H1:gwguild::" .. guildId .. "|h " .. name .. " ]|h|r"
+
+  return guildLink
+end
+function ITTsDonationBot.HandleClickEvent(rawLink, mouseButton, linkText, linkStyle, linkType, guildId, ...)
+  local gIndex = ITTsDonationBot.GetGuildIndex(guildId)
+  if linkType == "gwguild" then
+    if mouseButton == MOUSE_BUTTON_INDEX_LEFT then
+      GUILD_SELECTOR:SelectGuildByIndex(gIndex)
+      MAIN_MENU_KEYBOARD:ShowScene("guildHome")
+
+      return true
+    end
+
+    if mouseButton == MOUSE_BUTTON_INDEX_MIDDLE then
+      if DoesPlayerHaveGuildPermission(guildId, GUILD_PERMISSION_MANAGE_APPLICATIONS) == true then
+        GUILD_SELECTOR:SelectGuildByIndex(gIndex)
+        MAIN_MENU_KEYBOARD:ShowScene("guildRecruitmentKeyboard")
+
+        zo_callLater(
+          function()
+            GUILD_RECRUITMENT_KEYBOARD:ShowApplicationsList()
+          end,
+          250
+        )
+      else
+        zo_callLater(
+          function()
+            MAIN_MENU_KEYBOARD:ShowScene("guildRoster")
+          end,
+          50
+        )
+      end
+      return true
+    end
+
+    if mouseButton == MOUSE_BUTTON_INDEX_RIGHT then
+      ClearMenu()
+
+      AddCustomMenuItem(
+        "Show Guild Roster",
+        function()
+          GUILD_SELECTOR:SelectGuildByIndex(gIndex)
+          MAIN_MENU_KEYBOARD:ShowScene("guildRoster")
+        end
+      )
+      AddCustomMenuItem(
+        "Show Guild Ranks",
+        function()
+          GUILD_SELECTOR:SelectGuildByIndex(gIndex)
+          MAIN_MENU_KEYBOARD:ShowScene("guildRanks")
+        end
+      )
+      if DoesPlayerHaveGuildPermission(guildId, GUILD_PERMISSION_MANAGE_APPLICATIONS) == true then
+        AddCustomMenuItem(
+          "Show Guild Recruitment",
+          function()
+            GUILD_SELECTOR:SelectGuildByIndex(gIndex)
+            MAIN_MENU_KEYBOARD:ShowScene("guildRecruitmentKeyboard")
+          end
+        )
+      end
+      if DoesPlayerHaveGuildPermission(guildId, GUILD_PERMISSION_EDIT_HERALDRY) == true then
+        AddCustomMenuItem(
+          "Show Guild Heraldry",
+          function()
+            GUILD_SELECTOR:SelectGuildByIndex(gIndex)
+            MAIN_MENU_KEYBOARD:ShowScene("guildHeraldry")
+          end
+        )
+      end
+      AddCustomMenuItem(
+        "Show Guild History",
+        function()
+          GUILD_SELECTOR:SelectGuildByIndex(gIndex)
+          MAIN_MENU_KEYBOARD:ShowScene("guildHistory")
+        end
+      )
+      ShowMenu()
+      return true
+    end
+  end
+end
+LINK_HANDLER:RegisterCallback(LINK_HANDLER.LINK_MOUSE_UP_EVENT, ITTsDonationBot.HandleClickEvent)
+
+function ITTsDonationBot.GetGuildIndex(guildId)
+  local numg = 0
+
+  for gi = 1, GetNumGuilds() do
+    local gcheck = GetGuildId(gi)
+    local idNum = tonumber(guildId)
+    if (idNum == gcheck) then
+      return gi
+    end
+  end
+end
+-- --------------------
+-- Transfer Data
+-- --------------------
+
+function ITTsDonationBot:TransferData()
+  local guilds = {}
+  if db.records == nil then
+    d("none")
+  else
+    for guildId, dataTable in pairs(db.records[worldName]) do
+      if type(dataTable) == "table" then
+        for playerName, playerEvents in pairs(dataTable) do
+          for eventId, eventData in pairs(playerEvents) do
+            if not ITTsDonationBotData.records then
+              ITTsDonationBotData.records = {}
+            end
+            if not ITTsDonationBotData.records[worldName] then
+              ITTsDonationBotData.records[worldName] = {}
+            end
+            if not ITTsDonationBotData.records[worldName][guildId] then
+              ITTsDonationBotData.records[worldName][guildId] = {}
+            end
+            if not ITTsDonationBotData.records[worldName][guildId][playerName] then
+              ITTsDonationBotData.records[worldName][guildId][playerName] = {}
+            end
+            if not ITTsDonationBotData.records[worldName][guildId][playerName][tostring(eventId)] then
+              ITTsDonationBotData.records[worldName][guildId][playerName][tostring(eventId)] = {}
+              ITTsDonationBotData.records[worldName][guildId][playerName][tostring(eventId)] = {
+                timestamp = eventData.timestamp,
+                amount = eventData.amount
+              }
+            end
+          end
+        end
+      end
+      db.records = nil
+    end
+  end
+end
 -- --------------------
 -- Attach Listeners
 -- --------------------
