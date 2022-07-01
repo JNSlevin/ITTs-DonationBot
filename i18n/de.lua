@@ -1,3 +1,5 @@
+--! Translation done by @Lissy3001 and @JN_Slevin
+
 ITTsDonationBot.i18n = {
 	ITTDB_NAME = "ITT's Donation Bot",
 	ITTDB_HEADER = "Spenden",
