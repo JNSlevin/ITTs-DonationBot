@@ -913,7 +913,7 @@ function ITTsDonationBot:SetupFullScan()
 end
 function ITTsDonationBot:ScanEntireLH(guildId)
     ITTsDonationBotListener[guildId]:Stop()
-    ITTsDonationBotListener[guildId]:SetAfterEventId(StringToId64("0"))
+    ITTsDonationBotListener[guildId]:SetAfterEventTime(1413120020)
     ITTsDonationBotListener[guildId]:SetEventCallback(
         function(eventType, eventId, eventTime, param1, param2, param3, param4, param5, param6)
             self:SaveEvent(guildId, eventType, eventTime, param1, param2, eventId)
