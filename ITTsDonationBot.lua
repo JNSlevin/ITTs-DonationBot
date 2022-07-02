@@ -8,9 +8,7 @@ local logger = LibDebugLogger(ITTsDonationBot.name)
 logger:SetEnabled(true)
 local chat = LibChatMessage("ITTsDonationBot", "ITTs-DB")
 
-local SECONDS_IN_HOUR = 60 * 60
-local SECONDS_IN_DAY = SECONDS_IN_HOUR * 24
-local SECONDS_IN_WEEK = SECONDS_IN_DAY * 7
+local SECONDS_IN_WEEK = ZO_ONE_DAY_IN_SECONDS * 7
 
 local worldName = GetWorldName()
 local defaults = {
@@ -840,7 +838,7 @@ function ITTsDonationBot:SaveEvent(guildId, eventType, eventTime, param1, param2
       end
     end
 
-    if secsSinceEvent < SECONDS_IN_DAY then
+    if secsSinceEvent < ZO_ONE_DAY_IN_SECONDS then
       if not ITTsDonationBotData.records[worldName][guildId][displayName][id] then
         self:DisplayNotifications(guildId, displayName, amount, secsSinceEvent)
       end
@@ -885,10 +883,10 @@ function ITTsDonationBot:CreateListener(guildId)
   if ITTsDonationBotData ~= nil then
     lastEvent = ITTsDonationBotData.records[worldName]["lastEvent"]
   end
-  local setAfterTimeStamp = GetTimeStamp() - SECONDS_IN_DAY * 2
+  local setAfterTimeStamp = GetTimeStamp() - ZO_ONE_DAY_IN_SECONDS * 2
   ITTsDonationBotListener[guildId]:SetAfterEventTime(setAfterTimeStamp)
 
-  ITTsDonationBotListener[guildId]:SetNextEventCallback(
+  ITTsDonationBotListener[guildId]:SetEventCallback(
     function(eventType, eventId, eventTime, param1, param2, param3, param4, param5, param6)
       self:SaveEvent(guildId, eventType, eventTime, param1, param2, eventId)
     end
@@ -899,7 +897,7 @@ function ITTsDonationBot:CreateListener(guildId)
       logger:Warn("D O N E")
     end
   )
-  -- bankListener:SetStopOnLastEvent(true)
+  -- ITTsDonationBotListener[guildId]:SetStopOnLastEvent(true)
   ITTsDonationBotListener[guildId]:Start()
 end
 
@@ -912,7 +910,7 @@ function ITTsDonationBot:SetupFullScan()
 end
 function ITTsDonationBot:ScanEntireLH(guildId)
   ITTsDonationBotListener[guildId]:Stop()
-  ITTsDonationBotListener[guildId]:SetAfterEventTime(1413120020)
+    ITTsDonationBotListener[guildId]:SetAfterEventId(StringToId64("0"))
   ITTsDonationBotListener[guildId]:SetEventCallback(
     function(eventType, eventId, eventTime, param1, param2, param3, param4, param5, param6)
       self:SaveEvent(guildId, eventType, eventTime, param1, param2, eventId)
@@ -1051,7 +1049,7 @@ function ITTsDonationBot:GetTimestampOfDayStart(offset)
   local hours = timeObject.hour
   local mins = timeObject.min
   local secs = timeObject.sec
-  local UTCMidnightOffset = (hours * SECONDS_IN_HOUR) + (mins * 60) + secs
+  local UTCMidnightOffset = (hours * ZO_ONE_HOUR_IN_SECONDS) + (mins * 60) + secs
   local recordTimestamp = os.time(timeObject)
 
   return recordTimestamp - UTCMidnightOffset
