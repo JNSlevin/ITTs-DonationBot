@@ -1,3 +1,5 @@
+--! Translation done by @Barzoth and @Augma
+
 ITTsDonationBot.i18n = {
 	ITTDB_NAME = "ITT's Donation Bot",
 	ITTDB_HEADER = "Donations",
@@ -23,7 +25,7 @@ ITTsDonationBot.i18n = {
 	ITTDB_SETTINGS_NOTIFY = [[Les notifications ne s'appliquent que pour tout ce qui se passe au cours des dernières 24 heures.]],
 	ITTDB_SETTINGS_CHAT = "Notifications dans le chat",
 	ITTDB_SETTINGS_SCREEN = "Notifications à l'écran",
-	ITTDB_SETTINGS_LOTO_NAME = "Générateur de la liste du loto",
+	ITTDB_SETTINGS_LOTTO_NAME = "Générateur de la liste du loto",
 	ITTDB_SETTINGS_LOTTO_DESC = [[Cliquez pour générer les colonnes de calcul du loto. Vous pouvez définir la valeur d'un ticket ci-dessous, la valeur par défaut est 1000 = 1 ticket. Les résultats sont basés sur les dons au cours de "Cette semaine", qui est actuellement la semaine du marchand de guilde en jeu.]],
 	ITTDB_SETTINGS_LOTTO_SELECT = "Selection de Guilde",
 	ITTDB_SETTINGS_LOTTO_GUILD = "Membres de la guilde pour le loto",
@@ -41,6 +43,17 @@ ITTsDonationBot.i18n = {
 	ITTDB_SETTINGS_LOTTO_TICKETS = "Valeur du ticket",
 	ITTDB_SETTINGS_LOTTO_INFO_5 = "Colonne de nom générée ici",
 	ITTDB_SETTINGS_LOTTO_INFO_6 = "Colonne du montant générée ici",
+	ITTDB_LH_OPTIONS = "Paramètres pour LibHistoire",
+	ITTDB_LH_OPTION1_DESC = "Entrées manquantes",
+	ITTDB_LH_OPTION1_ENTRY = "Ceci va fouiller LibHistoire pour détecter toutes entrées manquantes",
+	ITTDB_LH_OPTION2_DESC = "Scan complet",
+	ITTDB_LH_OPTION2_ENTRY = "Selon la quantité de données contenues ou manquantes dans LibHistoire, ceci peut prendre du temps.",
+	ITTDB_LH_OPTION2_WARN = "Ceci va scanner l'entièreté des données de LibHistoire (peut être long)",
+	ITTDB_TRANSFER_OPTIONS = "Importer les paramètres",
+	ITTDB_TRANSFER_TITLE = "Transférer les vieilles archives",
+	ITTDB_TRANSFER_DESC = "|cff0000WARNING FAITES UNE COPIES DE VOS VARIABLES AVANT D'UTILISER CE BOUTON",
+	ITTDB_TRANSFER_WARN = "Avez-vous effectué une copie de vos variables ?",
+	ITTDB_TRANSFER_REMINDER = "|cffffffNous avons détecté que vous avez des données enregistrées avant la mise à jour ! Pas d'inquiétude, vos données sont toujours disponibles. Allez sur le menu de l'addon et cliquez sur <<Importer les paramètres>>, suivez ensuite les instructions. Merci !",
 	-- Notifications
 	ITTDB_NOTIFICATION = "${user} à déposé ${amount} dans la guilde: ${guild} ${time}",
 	-- Null

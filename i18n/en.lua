@@ -41,6 +41,17 @@ ITTsDonationBot.i18n = {
 	ITTDB_SETTINGS_LOTTO_TICKETS = "Ticket Values",
 	ITTDB_SETTINGS_LOTTO_INFO_5 = "Name column generated here",
 	ITTDB_SETTINGS_LOTTO_INFO_6 = "Amount column generated here",
+	ITTDB_LH_OPTIONS = "LibHistoire Options",
+	ITTDB_LH_OPTION1_DESC = "Missing Entries",
+	ITTDB_LH_OPTION1_ENTRY = "This will scan LibHistoire for any missing entries",
+	ITTDB_LH_OPTION2_DESC = "Full Scan",
+	ITTDB_LH_OPTION2_ENTRY = "This can take time, depending on how much data you are missing and how much data you have stored in your LibHistoire.",
+	ITTDB_LH_OPTION2_WARN = "This will scan the entirety of LibHistoire's data (might take a while)",
+	ITTDB_TRANSFER_OPTIONS = "Import Options",
+	ITTDB_TRANSFER_TITLE = "Transfer old records",
+	ITTDB_TRANSFER_DESC = "|cff0000WARNING BACK UP YOUR SAVED VARIABLES BEFORE PRESSING THIS BUTTON",
+	ITTDB_TRANSFER_WARN = "Have you backed up your Saved Variables?",
+	ITTDB_TRANSFER_REMINDER = "|cffffffWe have detected that you have saved data before the update! Don't worry, your data is still there, please head to our Addon Menu and click on <<Import Options>> and follow the instructions there. Thank you!",
 	-- Notifications
 	ITTDB_NOTIFICATION = "${user} has donated ${amount} to ${guild} ${time}",
 	-- Null
